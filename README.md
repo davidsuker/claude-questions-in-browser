@@ -6,7 +6,16 @@ When Claude asks you something, a local page opens with the questions laid out â
 previews, multi-select, and a free-text box. You answer there, and Claude carries on as if you
 had answered in the terminal.
 
-<!-- Add screenshots here: the question page, and the answers summary. -->
+![Three questions rendered in the browser, with a code preview beside the selected option](docs/screenshots/question-page.png)
+
+<details>
+<summary>Dark theme, and the summary shown after answering</summary>
+
+![The same page in dark theme](docs/screenshots/question-page-dark.png)
+
+![The answers summary, listing every option with the chosen ones ticked](docs/screenshots/answers-summary.png)
+
+</details>
 
 ## Why
 
@@ -309,7 +318,9 @@ field is silently ignored â€” the hook looks correct, returns valid JSON, and th
 appears anyway. Pre-filling `answers` via `updatedInput` is what actually works.
 
 That is an implementation detail nobody promised, and it could change in any release. Verified
-against **Claude Code 2.1.220**. If a future version breaks it, the symptom is the browser page
+against **Claude Code 2.1.220** (`claude --version`), by using it: every question in the session
+that built this repo was answered through the page. If a future version breaks it, the symptom is
+the browser page
 opening and the terminal *also* asking.
 
 ### Cancelling a question
