@@ -1,0 +1,40 @@
+{
+  "_comment": [
+    "Example Claude Code settings for claude-questions-in-browser.",
+    "Merge these blocks into ~/.claude/settings.json (all projects) or a project's",
+    ".claude/settings.json (that project only). If you already have `env`, `hooks`, or a",
+    "`PreToolUse` array, add to them rather than replacing them.",
+    "Adjust the clone path in `command`, and drop the `env` block entirely to use your",
+    "default browser and leave focus alone.",
+    "",
+    "CLAUDE_ASK_KEEP_FOCUS keeps the question from stealing focus mid-sentence. Swap it for",
+    "CLAUDE_ASK_ACTIVATE (\"Google Chrome\") if you would rather be pulled to the page instead;",
+    "setting both is pointless, as KEEP_FOCUS wins.",
+    "",
+    "With focus left alone, the sound is what tells you a question arrived. CLAUDE_ASK_WAIT_MS",
+    "and the hook `timeout` must move together: the hook surrenders at WAIT_MS so Claude Code",
+    "never kills it at `timeout`, which would leave you with no fallback."
+  ],
+
+  "env": {
+    "CLAUDE_ASK_BROWSER": "'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --profile-directory='Profile 3' '{url}'",
+    "CLAUDE_ASK_KEEP_FOCUS": "1",
+    "CLAUDE_ASK_SOUND": "Submarine",
+    "CLAUDE_ASK_WAIT_MS": "3540000"
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/dev/claude-questions-in-browser/hooks/ask-user-question-web.mjs",
+            "timeout": 3600
+          }
+        ]
+      }
+    ]
+  }
+}

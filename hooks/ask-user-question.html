@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude is asking</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #faf9f7;
+    --card: #ffffff;
+    --fg: #1f1e1c;
+    --muted: #6b6862;
+    --line: #e4e1db;
+    --accent: #c15f3c;
+    --accent-fg: #ffffff;
+    --chip: #efece6;
+    --pre: #f4f2ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #191817;
+      --card: #232120;
+      --fg: #eeece7;
+      --muted: #9a958c;
+      --line: #363330;
+      --accent: #d97757;
+      --accent-fg: #1a1817;
+      --chip: #2e2b29;
+      --pre: #1c1b1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2.5rem 1.25rem 5rem;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 60rem; margin: 0 auto; }
+  h1 { margin: 0 0 0.75rem; font-size: 1.25rem; font-weight: 600; word-break: break-word; }
+  header { border-bottom: 1px solid var(--line); margin-bottom: 1.5rem; }
+  .facts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; margin-bottom: 1rem; }
+  .fact {
+    background: var(--chip);
+    border-radius: 5px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .fact.branch::before { content: "\2387\00a0"; }
+  .fact.path {
+    background: none;
+    padding: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+  .chip {
+    display: inline-block;
+    background: var(--chip);
+    color: var(--muted);
+    border-radius: 5px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+  .chip-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+  .chip-row .chip { margin-bottom: 0; }
+  .chip-row + .q { margin-top: 0.6rem; }
+  .count {
+    flex: none;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .count.done { color: var(--accent); }
+  .q { font-size: 1.05rem; font-weight: 600; margin: 0 0 1rem; }
+  .split { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+  .split.has-preview { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  @media (max-width: 46rem) { .split.has-preview { grid-template-columns: minmax(0, 1fr); } }
+  label.opt {
+    display: flex;
+    gap: 0.65rem;
+    align-items: flex-start;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 0.7rem 0.85rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+  }
+  label.opt:hover { border-color: var(--accent); }
+  label.opt:has(:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  label.opt input { margin-top: 0.28rem; accent-color: var(--accent); flex: none; }
+  .opt-body { flex: 1; min-width: 0; }
+  .opt-label { font-weight: 550; }
+  .opt-desc { color: var(--muted); font-size: 0.87rem; margin-top: 0.15rem; }
+  .other-input {
+    display: block;
+    width: 100%;
+    margin-top: 0.45rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .other-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  pre.preview {
+    margin: 0;
+    padding: 0.9rem;
+    background: var(--pre);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    overflow-x: auto;
+    white-space: pre;
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    min-height: 100%;
+  }
+  pre.preview.empty { color: var(--muted); font-style: italic; }
+  .bar { position: sticky; bottom: 0; padding: 1rem 0; background: linear-gradient(transparent, var(--bg) 35%); }
+  button {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: 0;
+    border-radius: 9px;
+    padding: 0.7rem 1.5rem;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button[disabled] { opacity: 0.4; cursor: not-allowed; }
+  .bar { display: flex; align-items: center; gap: 0.75rem; }
+  .bar .count { margin-left: 0.25rem; }
+  .clock { margin-left: auto; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .clock.urgent { color: var(--accent); font-weight: 600; }
+  button.secondary { background: none; color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
+  button.secondary:hover { color: var(--fg); border-color: var(--accent); }
+  .done { padding: 0 0 1.25rem; }
+  .done h2 { margin: 0 0 0.25rem; font-size: 1.05rem; font-weight: 600; }
+  .done-sub { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .sent + .sent { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+  .sent-q { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.6rem; }
+  .sent-opts { list-style: none; margin: 0; padding: 0; }
+  .sent-opts li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    padding: 0.15rem 0;
+    color: var(--muted);
+  }
+  .sent-opts li.picked { color: var(--fg); font-weight: 600; }
+  .sent-opts .mark { flex: none; width: 1ch; text-align: center; }
+  .sent-opts li.picked .mark { color: var(--accent); }
+  .sent-opts .tag {
+    background: var(--chip);
+    border-radius: 4px;
+    padding: 0 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<main id="root"></main>
+<script type="application/json" id="payload">__PAYLOAD__</script>
+<script>
+(() => {
+  const { questions, title, project, branch, cwd, remaining, idleMs, hardRemaining } =
+    JSON.parse(document.getElementById('payload').textContent);
+  const root = document.getElementById('root');
+  if (title) document.title = title;
+  // question text -> { value: string | Set<string>, other: string, preview: string | null }
+  const state = new Map();
+
+  const el = (tag, props = {}, kids = []) => {
+    const n = Object.assign(document.createElement(tag), props);
+    for (const k of kids) n.append(k);
+    return n;
+  };
+
+  const OTHER = '__other__';
+
+  /** Session context, shared by the question and answer views. Returns [] if nothing is known. */
+  function header() {
+    const heading = title ? el('h1', { textContent: title }) : null;
+
+    // Only what distinguishes one session from another; anything missing is simply omitted.
+    const facts = el('div', { className: 'facts' });
+    if (project) facts.append(el('span', { className: 'fact', textContent: project }));
+    if (branch) facts.append(el('span', { className: 'fact branch', textContent: branch }));
+    if (cwd) facts.append(el('span', { className: 'fact path', title: cwd, textContent: cwd }));
+
+    const bits = [heading, facts.children.length ? facts : null].filter(Boolean);
+    return bits.length ? [el('header', {}, bits)] : [];
+  }
+
+  function render() {
+    root.replaceChildren(...header());
+
+    questions.forEach((q, qi) => {
+      const st = { value: q.multiSelect ? new Set() : null, other: '', preview: null };
+      state.set(q.question, st);
+
+      const hasPreview = q.options.some((o) => o.preview);
+      const list = el('div');
+      const pane = hasPreview
+        ? el('pre', { className: 'preview empty', textContent: 'Select an option to preview it.' })
+        : null;
+
+      const setPreview = (text) => {
+        if (!pane) return;
+        st.preview = text || null;
+        pane.textContent = text || 'Select an option to preview it.';
+        pane.classList.toggle('empty', !text);
+      };
+
+      const rows = [...q.options.map((o) => ({ ...o })), { label: 'Other', description: 'Type your own answer.', other: true }];
+
+      for (const opt of rows) {
+        const input = el('input', {
+          type: q.multiSelect ? 'checkbox' : 'radio',
+          name: `q${qi}`,
+          value: opt.other ? OTHER : opt.label,
+        });
+        const body = el('div', { className: 'opt-body' }, [
+          el('div', { className: 'opt-label', textContent: opt.label }),
+        ]);
+        if (opt.description) body.append(el('div', { className: 'opt-desc', textContent: opt.description }));
+
+        let free = null;
+        if (opt.other) {
+          free = el('textarea', { className: 'other-input', rows: 3, placeholder: 'Your answer…' });
+          free.addEventListener('input', () => {
+            st.other = free.value;
+            if (!input.checked) input.click();
+            sync();
+          });
+          // Keep the click from reaching the wrapping label (which would re-toggle the option)
+          // without suppressing it here — the textarea still needs it to place the caret.
+          free.addEventListener('click', (e) => e.stopPropagation());
+          body.append(free);
+        }
+
+        input.addEventListener('change', () => {
+          if (q.multiSelect) {
+            input.checked ? st.value.add(input.value) : st.value.delete(input.value);
+            // Multi-select keeps no single "chosen" preview, so the pane just follows the
+            // row you last touched — otherwise it would sit empty for the whole question.
+            setPreview(input.checked ? opt.preview : null);
+          } else {
+            st.value = input.value;
+            setPreview(opt.preview);
+          }
+          sync();
+        });
+
+        list.append(el('label', { className: 'opt' }, [input, body]));
+      }
+
+      const split = el('div', { className: `split${hasPreview ? ' has-preview' : ''}` }, [list]);
+      if (pane) split.append(pane);
+
+      // Position only makes sense against a total, so a lone question gets the chip by itself.
+      const heading = questions.length > 1
+        ? el('div', { className: 'chip-row' }, [
+            el('span', { className: 'chip', textContent: q.header }),
+            el('span', { className: 'count', textContent: `${qi + 1} / ${questions.length}` }),
+          ])
+        : el('span', { className: 'chip', textContent: q.header });
+
+      root.append(el('div', { className: 'card' }, [
+        heading,
+        el('div', { className: 'q', textContent: q.question }),
+        split,
+      ]));
+    });
+
+    const button = el('button', { textContent: 'Submit', disabled: true });
+    button.addEventListener('click', submit);
+    // Always enabled — backing out must not depend on having answered anything.
+    const cancel = el('button', { className: 'secondary', textContent: 'Answer in terminal' });
+    cancel.addEventListener('click', abandon);
+    // How many are still outstanding, so the disabled Submit button is never a mystery.
+    const tally = questions.length > 1 ? el('span', { className: 'count' }) : null;
+    const clock = el('span', { className: 'clock' });
+    root.append(el('div', { className: 'bar' }, [button, cancel, ...(tally ? [tally] : []), clock]));
+    startClock(clock);
+
+    function answered(q) {
+      const st = state.get(q.question);
+      const picked = q.multiSelect ? [...st.value] : (st.value ? [st.value] : []);
+      if (!picked.length) return false;
+      return !picked.includes(OTHER) || st.other.trim().length > 0;
+    }
+    function sync() {
+      const done = questions.filter(answered).length;
+      button.disabled = done < questions.length;
+      if (tally) {
+        tally.textContent = `${done} of ${questions.length} answered`;
+        tally.classList.toggle('done', done === questions.length);
+      }
+    }
+    sync();
+  }
+
+  /**
+   * The hook expires the question if the page goes untouched, so working through it has to count
+   * as being alive.
+   *
+   * The displayed deadline is recomputed locally on *every* interaction, while the ping that tells
+   * the hook is throttled to one every ten seconds. Doing both on the throttle made the countdown
+   * look arbitrary — some keystrokes appeared to reset it and others did not, depending on where
+   * they fell in the ten-second window. The clock now always resets when you touch the page; the
+   * throttle only limits how often the server hears about it.
+   */
+  const hardDeadline = Date.now() + (hardRemaining ?? 0);
+  let deadline = Date.now() + (remaining ?? 0);
+  let lastPing = 0;
+
+  function keepalive() {
+    // Never past the hard ceiling, which no amount of typing can extend.
+    deadline = Math.min(Date.now() + (idleMs ?? 0), hardDeadline);
+    const now = Date.now();
+    if (now - lastPing < 10_000) return;
+    lastPing = now;
+    fetch('/keepalive', { method: 'POST' })
+      .then((r) => r.json())
+      .then(({ remaining: left }) => { deadline = Date.now() + left; })
+      .catch(() => {}); // A dead server shows up in the countdown soon enough.
+  }
+  for (const evt of ['keydown', 'pointerdown', 'input', 'focus']) {
+    document.addEventListener(evt, keepalive, true);
+  }
+
+  /**
+   * Count the wait down, so a question does not silently expire while you are reading it. Always
+   * visible: a timer that appears only near the end is itself a surprise, and knowing the clock
+   * resets as you work is the point.
+   */
+  function startClock(node) {
+    if (!remaining) return;
+    const tick = () => {
+      const left = Math.max(0, deadline - Date.now());
+      const secs = Math.ceil(left / 1000);
+      const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+      // Say which clock is running. Idle is the one you can reset; the ceiling is not.
+      const capped = deadline >= hardDeadline - 1000;
+      node.textContent = left
+        ? capped
+          ? `expires in ${clock} — session limit`
+          : `expires in ${clock} if idle`
+        : 'expired — back to the terminal';
+      node.title = capped
+        ? 'The hook cannot wait past this point, however much you interact with the page.'
+        : 'Typing, clicking or focusing this page resets the countdown.';
+      node.classList.toggle('urgent', left <= 60_000);
+    };
+    tick();
+    setInterval(tick, 1000);
+  }
+
+  /**
+   * Back out of the page. The hook defers, so the same question comes back in the terminal
+   * picker — this hands the question over rather than throwing it away.
+   */
+  function abandon() {
+    fetch('/cancel', { method: 'POST' }).finally(() => {
+      root.replaceChildren(
+        ...header(),
+        el('div', { className: 'done' }, [
+          el('h2', { textContent: 'Handed back to the terminal' }),
+          el('p', { className: 'done-sub', textContent: 'Answer in Claude Code as usual. You can close this tab.' }),
+        ]),
+      );
+    });
+  }
+
+  // Esc does not reach Claude Code while the hook is blocking, so the page honours it instead.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') abandon();
+  });
+
+  function submit() {
+    const answers = {};
+    const annotations = {};
+    const chosen = new Map(); // question -> raw values, with OTHER still unresolved
+    for (const q of questions) {
+      const st = state.get(q.question);
+      const raw = q.multiSelect ? [...st.value] : [st.value];
+      chosen.set(q.question, raw);
+      const picked = raw.map((v) => (v === OTHER ? st.other.trim() : v));
+      answers[q.question] = picked.join(', ');
+      const notes = {};
+      // Only single-select carries a preview annotation; on multi-select the pane is just a
+      // browsing aid and whatever it last showed is not "the" answer's preview.
+      if (st.preview && !q.multiSelect) notes.preview = st.preview;
+      if (picked.includes(st.other.trim()) && st.other.trim()) notes.notes = st.other.trim();
+      if (Object.keys(notes).length) annotations[q.question] = notes;
+    }
+    fetch('/submit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ answers, annotations }),
+    }).finally(() => {
+      // Echo the answers back so the tab is a record of what was sent, not just a dead end.
+      const summary = el('div', { className: 'card' });
+      for (const q of questions) {
+        const raw = chosen.get(q.question);
+        const st = state.get(q.question);
+
+        // Every option is listed, so the summary records what was passed over as well as
+        // what was taken — the rejected options are the context for the choice.
+        const rows = q.options.map((o) => ({ text: o.label, picked: raw.includes(o.label) }));
+        if (raw.includes(OTHER)) rows.push({ text: st.other.trim(), picked: true, other: true });
+
+        const list = el('ul', { className: 'sent-opts' });
+        for (const row of rows) {
+          list.append(
+            el('li', { className: row.picked ? 'picked' : '' }, [
+              el('span', { className: 'mark', textContent: row.picked ? '✓' : '·' }),
+              el('span', { textContent: row.text }),
+              ...(row.other ? [el('span', { className: 'tag', textContent: 'typed' })] : []),
+            ]),
+          );
+        }
+
+        summary.append(
+          el('div', { className: 'sent' }, [
+            el('span', { className: 'chip', textContent: q.header }),
+            el('div', { className: 'sent-q', textContent: q.question }),
+            list,
+          ]),
+        );
+      }
+      root.replaceChildren(
+        ...header(),
+        el('div', { className: 'done' }, [
+          el('h2', { textContent: 'Answers sent' }),
+          el('p', { className: 'done-sub', textContent: 'You can close this tab.' }),
+        ]),
+        summary,
+      );
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
