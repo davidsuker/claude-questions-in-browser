@@ -223,9 +223,9 @@ waiting. Claude Code's TUI repaints the screen and rewrites the window title, so
 — but the **status line** works.
 
 While the hook is waiting it writes `/tmp/claude-ask-waiting-<session_id>` containing the URL and
-the question count, and deletes it as soon as the question is resolved. Any status line script can pick that up. Add this
-to yours (`statusLine.command` in `~/.claude/settings.json`), which receives the session JSON on
-stdin:
+the question count, and deletes it as soon as the question is resolved. Any status line script can
+pick that up. Add this to yours (`statusLine.command` in `~/.claude/settings.json`), which receives
+the session JSON on stdin — `jq` is used here to read the session id out of it:
 
 ```sh
 input=$(cat)
