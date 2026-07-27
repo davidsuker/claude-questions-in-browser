@@ -17,11 +17,42 @@ had answered in the terminal.
 
 </details>
 
-## Why
+## The problem
 
-The terminal picker is fine for a quick choice between two options. It is less good when the
-question has four options with long descriptions, or a code preview you want to read properly,
-or when you want to write a couple of paragraphs in reply. A browser page has room.
+When Claude Code needs a decision from you it calls `AskUserQuestion`, and the answer steers what
+it does next — which approach to take, what to include, whether to proceed. Those are the moments
+where a considered answer is worth the most, and they are exactly the moments the terminal serves
+worst.
+
+The built-in picker draws inside whatever space the TUI has left. So:
+
+- **Long options get cut off.** Four options with a sentence of explanation each do not fit, so the
+  text that would tell you which to pick is the first thing to go.
+- **Previews are hard to read.** A question can carry a code snippet per option — the thing you
+  most want to read carefully — rendered into a few lines of a repainting terminal.
+- **Free text is cramped.** "Other" is a single line in a picker. If the real answer is two
+  paragraphs of context, the interface argues against giving it.
+- **It interrupts wherever you are.** The question appears in a terminal you may not be looking at,
+  and blocks until you answer.
+
+The failure mode is quiet: you pick something reasonable-looking from what you can see, rather than
+the thing you would have picked having read all of it. The tool did ask; you just could not
+comfortably answer.
+
+## Why a browser page
+
+A page has room, and it is already the thing on your machine best at long text, code and forms. So
+the descriptions are shown in full, previews get a pane of their own, "Other" is a real textarea,
+and four questions at once is a scroll rather than a queue.
+
+None of that changes the contract. The page hands the answers back through the tool's own
+`answers` field, so Claude sees exactly what the terminal picker would have produced — and if
+anything goes wrong, the question falls back to the terminal picker rather than being lost.
+
+The rest is consequences of blocking a terminal for as long as a person takes to think: knowing a
+question is waiting ([status line](#status-line-integration-optional), [sound](#claude_ask_sound)),
+getting out of one you do not want to answer ([cancelling](#cancelling-a-question)), and not having
+focus yanked away mid-sentence ([`CLAUDE_ASK_KEEP_FOCUS`](#claude_ask_keep_focus)).
 
 ## Requirements
 
