@@ -7,7 +7,7 @@
 
 import http from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
-import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { writeFileSync, unlinkSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -45,6 +45,56 @@ const SOUND_REPEATS = (process.env.CLAUDE_ASK_SOUND_REPEATS ?? '60,120')
   .split(',')
   .map((s) => Number(s.trim()) * 1000)
   .filter((ms) => ms > 0);
+// Off switch, for when the machine running the session is not the machine you are sitting at —
+// /remote-control and /teleport being the cases that matter. A page opened on a laptop you have
+// walked away from is a question nobody can answer, and Claude waits until it times out.
+//
+// Usually nothing to set: `/remote-control` is detected and the hook stands down on its own.
+// The manual forms below remain for the cases detection cannot see.
+const OFF_FILE = process.env.CLAUDE_ASK_OFF_FILE || `${process.env.HOME}/.claude/ask-web-off`;
+// Claude Code keeps live per-session state here, one file per process, rewritten as the session
+// changes. It is the only place remote control is observable from outside the process.
+const SESSIONS_DIR = process.env.CLAUDE_ASK_SESSIONS_DIR || `${process.env.HOME}/.claude/sessions`;
+// Undocumented internal state, so treat it as a courtesy that may vanish in a future release:
+// every read is best-effort, and anything unexpected leaves the page enabled rather than
+// silently swallowing questions.
+const AUTO_DETECT = process.env.CLAUDE_ASK_DETECT_REMOTE !== '0';
+
+/**
+ * True when this session is currently driven from another device.
+ *
+ * `bridgeSessionId` is the connection to the phone or browser acting as the remote: it holds an
+ * id for exactly as long as remote control is connected, gets a fresh id on each reconnect, and
+ * returns to null on disconnect. Files are matched on session id rather than pid, because the
+ * hook's own pid is not the session's and CLAUDE_PID is not guaranteed to reach a hook.
+ */
+function remoteControlled(id) {
+  if (!AUTO_DETECT || !id) return false;
+  try {
+    for (const name of readdirSync(SESSIONS_DIR)) {
+      if (!name.endsWith('.json')) continue;
+      let state;
+      try {
+        state = JSON.parse(readFileSync(`${SESSIONS_DIR}/${name}`, 'utf8'));
+      } catch {
+        continue; // Half-written or not ours; the next file may still match.
+      }
+      if (state?.sessionId === id) return Boolean(state.bridgeSessionId);
+    }
+  } catch {
+    // No sessions directory, or no permission to read it. Fall through to the manual switches.
+  }
+  return false;
+}
+
+const disabled = (id) => {
+  if (process.env.CLAUDE_ASK_DISABLE === '1') return 'disabled by CLAUDE_ASK_DISABLE';
+  if (existsSync(OFF_FILE)) return `disabled by ${OFF_FILE}`;
+  // Per-session form, so one session can opt out without silencing the rest.
+  if (id && existsSync(`/tmp/claude-ask-off-${id}`)) return `disabled for session ${id}`;
+  if (remoteControlled(id)) return 'remote control is connected; asking in the session instead';
+  return '';
+};
 
 const emit = (hookSpecificOutput) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput }));
@@ -374,6 +424,11 @@ function ask(questions, meta, sessionId) {
 
 try {
   const payload = JSON.parse(await readStdin());
+  // Checked before anything is opened or served, so a disabled hook is indistinguishable from
+  // one that was never installed: the terminal picker asks, and the remote client renders it.
+  const off = disabled(payload?.session_id);
+  if (off) defer(off);
+
   const questions = payload?.tool_input?.questions;
   if (!Array.isArray(questions) || questions.length === 0) defer('no questions in tool_input');
 

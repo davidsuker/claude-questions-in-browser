@@ -256,6 +256,51 @@ reminders with `CLAUDE_ASK_SOUND_REPEATS`, a comma-separated list of seconds (`"
 > nothing to ring. The sound, and the [status line](#status-line-integration-optional), are the
 > surfaces that work.
 
+### Remote control, and turning it off
+
+The page opens on the machine running the session. When you have walked away from that machine —
+`/remote-control` from your phone, `/teleport` to another device — a page on the laptop is a
+question nobody can answer, and Claude blocks on it until the wait times out.
+
+**This is handled for you.** While remote control is connected the hook stands down and defers,
+so Claude Code asks in the session itself and your remote client renders the picker natively.
+Disconnect and the browser page comes back. Nothing to turn on, nothing to remember.
+
+#### How it detects it
+
+Claude Code keeps live per-session state in `~/.claude/sessions/<pid>.json`, and the field
+`bridgeSessionId` is the connection to the device acting as the remote. It holds an id for
+exactly as long as remote control is connected, takes a fresh id on each reconnect, and returns
+to `null` on disconnect. The hook matches the file on session id — not pid, which for a hook is
+its own — and defers when the field is set.
+
+That is undocumented internal state and may change in a future release, so every read is
+best-effort: a missing directory, a half-written file, an unreadable one, or an unrecognised
+shape all leave the page **enabled**. The failure mode is the browser opening when it could have
+deferred, never a question silently swallowed. Set `CLAUDE_ASK_DETECT_REMOTE=0` to skip the
+check entirely.
+
+`/teleport` is not covered — it moves the session to a different machine, which this signal does
+not describe. Use a manual switch for that.
+
+#### Manual switches
+
+Still useful for `/teleport`, a permanently headless box, or if detection is ever wrong:
+
+| Switch | Scope | Toggle |
+| --- | --- | --- |
+| `~/.claude/ask-web-off` (file exists) | Everything, immediately | `touch` / `rm` at any time |
+| `/tmp/claude-ask-off-<session_id>` | One session | `touch` / `rm` at any time |
+| `CLAUDE_ASK_DISABLE=1` | The session, from launch | `env` block, or `CLAUDE_ASK_DISABLE=1 claude` |
+
+The file forms are read fresh on every question, so they can be flipped mid-session — including
+by asking Claude, from the remote device, to run `touch ~/.claude/ask-web-off`. Remember to `rm`
+it when you sit back down; a forgotten switch disables the page silently. Override the global
+path with `CLAUDE_ASK_OFF_FILE`.
+
+Whichever route disables it, the hook defers before opening a browser or binding a port — so it
+behaves exactly like a hook that was never installed.
+
 ## Status line integration (optional)
 
 If the question opens in a tab that then gets buried, nothing in the terminal tells you Claude is
